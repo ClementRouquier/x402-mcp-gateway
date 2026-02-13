@@ -5,8 +5,6 @@ import { vi } from "vitest";
 process.env.DATABASE_URL =
   process.env.DATABASE_URL || "postgresql://localhost:5432/test";
 process.env.NEXT_PUBLIC_CHAIN_ID = "84532";
-process.env.HOT_WALLET_ENCRYPTION_KEY =
-  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID = "test-project-id";
 
 // Mock @/lib/db globally so no test needs a real Postgres connection.

@@ -1,6 +1,6 @@
 import {
   TEST_WALLET_ADDRESS,
-  TEST_ENCRYPTED_PRIVATE_KEY,
+  TEST_CDP_ACCOUNT_NAME,
 } from "./crypto";
 
 /** Deterministic UUID for the default test user. */
@@ -30,14 +30,14 @@ export function createTestHotWallet(
   overrides?: {
     id?: string;
     address?: string;
-    encryptedPrivateKey?: string;
+    cdpAccountName?: string;
   },
 ) {
   return {
     id: overrides?.id ?? "00000000-0000-4000-a000-000000000010",
     address: overrides?.address ?? TEST_WALLET_ADDRESS,
-    encryptedPrivateKey:
-      overrides?.encryptedPrivateKey ?? TEST_ENCRYPTED_PRIVATE_KEY,
+    cdpAccountName:
+      overrides?.cdpAccountName ?? TEST_CDP_ACCOUNT_NAME,
     userId,
   };
 }

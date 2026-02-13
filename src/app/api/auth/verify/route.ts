@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SiweMessage } from "siwe";
 import { prisma } from "@/lib/db";
-import { createHotWallet } from "@/lib/hot-wallet";
+import { createCdpWallet } from "@/lib/hot-wallet";
 import { createSession, consumeNonceCookie } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
@@ -44,23 +44,25 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user) {
-      // Create user with hot wallet and default spending policy
-      const { address, encryptedPrivateKey } = createHotWallet();
-
+      // Create user first, then create CDP wallet with the userId
       user = await prisma.user.create({
         data: {
           walletAddress,
-          hotWallet: {
-            create: {
-              address,
-              encryptedPrivateKey,
-            },
-          },
           spendingPolicy: {
             create: {},
           },
         },
         include: { hotWallet: true, spendingPolicy: true },
+      });
+
+      const { address, cdpAccountName } = await createCdpWallet(user.id);
+
+      await prisma.hotWallet.create({
+        data: {
+          address,
+          cdpAccountName,
+          userId: user.id,
+        },
       });
     }
 

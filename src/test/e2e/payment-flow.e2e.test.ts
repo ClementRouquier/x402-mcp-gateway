@@ -1,12 +1,30 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { Hex } from "viem";
 import { verifyTypedData } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import { resetTestDb, seedTestUser } from "@/test/helpers/db";
-import { TEST_WALLET_ADDRESS } from "@/test/helpers/crypto";
+import { TEST_PRIVATE_KEY, TEST_WALLET_ADDRESS } from "@/test/helpers/crypto";
 import { prisma } from "@/lib/db";
 import { chainConfig } from "@/lib/chain-config";
 import { authorizationTypes } from "@/lib/x402/eip712";
 import { parsePaymentRequired } from "@/lib/x402/headers";
+
+// Mock CDP client — return a signer backed by the test private key
+const testAccount = privateKeyToAccount(TEST_PRIVATE_KEY);
+vi.mock("@/lib/cdp", () => ({
+  getCdpClient: vi.fn(() => ({
+    evm: {
+      getOrCreateAccount: vi.fn(() =>
+        Promise.resolve({
+          address: testAccount.address,
+          signTypedData: (args: Parameters<typeof testAccount.signTypedData>[0]) =>
+            testAccount.signTypedData(args),
+        }),
+      ),
+    },
+  })),
+}));
+
 // Mock fetch so executePayment can reach endpoints despite URL validation
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);

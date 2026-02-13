@@ -11,7 +11,7 @@ vi.mock("@/lib/auth", () => ({
   getAuthenticatedUser: vi.fn().mockResolvedValue({ userId: "00000000-0000-4000-a000-000000000001" }),
 }));
 
-// Mock hot-wallet module for balance and withdrawal
+// Mock hot-wallet module for balance, withdrawal, and wallet creation
 vi.mock("@/lib/hot-wallet", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/hot-wallet")>();
   return {
@@ -20,6 +20,10 @@ vi.mock("@/lib/hot-wallet", async (importOriginal) => {
     withdrawFromHotWallet: vi
       .fn()
       .mockResolvedValue({ txHash: "0x" + "f".repeat(64) }),
+    createCdpWallet: vi.fn().mockResolvedValue({
+      address: "0x" + "d".repeat(40),
+      cdpAccountName: "x402-mock-user-id",
+    }),
   };
 });
 

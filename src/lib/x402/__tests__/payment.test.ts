@@ -1,8 +1,29 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { privateKeyToAccount } from "viem/accounts";
 import { prisma } from "../../db";
 import { resetTestDb, seedTestUser } from "../../../test/helpers/db";
 import { createTestTransaction } from "../../../test/helpers/fixtures";
-import { executePayment } from "../payment";
+import { TEST_PRIVATE_KEY, TEST_WALLET_ADDRESS } from "../../../test/helpers/crypto";
+
+// Mock CDP client — return a signer backed by the test private key
+// so the x402 SDK can actually produce valid EIP-712 signatures.
+const testAccount = privateKeyToAccount(TEST_PRIVATE_KEY);
+vi.mock("@/lib/cdp", () => ({
+  getCdpClient: vi.fn(() => ({
+    evm: {
+      getOrCreateAccount: vi.fn(() =>
+        Promise.resolve({
+          address: testAccount.address,
+          signTypedData: (args: Parameters<typeof testAccount.signTypedData>[0]) =>
+            testAccount.signTypedData(args),
+        }),
+      ),
+    },
+  })),
+}));
+
+// Import after CDP mock so the module picks up the mock
+const { executePayment } = await import("../payment");
 
 // Mock global fetch to avoid real network calls and bypass URL validation on loopback
 const mockFetch = vi.fn();

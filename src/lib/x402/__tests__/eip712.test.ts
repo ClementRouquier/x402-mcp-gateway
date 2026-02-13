@@ -1,20 +1,40 @@
-import { describe, it, expect } from "vitest";
-import { createEvmSigner, createExactEvmScheme } from "../eip712";
-import { TEST_PRIVATE_KEY, TEST_WALLET_ADDRESS } from "../../../test/helpers/crypto";
+import { describe, it, expect, vi } from "vitest";
+import { privateKeyToAccount } from "viem/accounts";
+import { TEST_PRIVATE_KEY, TEST_WALLET_ADDRESS, TEST_CDP_ACCOUNT_NAME } from "../../../test/helpers/crypto";
 
-describe("createEvmSigner", () => {
-  it("creates a signer with the correct address", () => {
-    const signer = createEvmSigner(TEST_PRIVATE_KEY);
+// Mock CDP client — return a signer that delegates to viem's privateKeyToAccount
+// so we can verify that signTypedData actually produces correct EIP-712 signatures.
+const testAccount = privateKeyToAccount(TEST_PRIVATE_KEY);
+vi.mock("@/lib/cdp", () => ({
+  getCdpClient: vi.fn(() => ({
+    evm: {
+      getOrCreateAccount: vi.fn(() =>
+        Promise.resolve({
+          address: testAccount.address,
+          signTypedData: (args: Parameters<typeof testAccount.signTypedData>[0]) =>
+            testAccount.signTypedData(args),
+        }),
+      ),
+    },
+  })),
+}));
+
+// Import after mocks are set up
+const { createCdpEvmSigner, createExactEvmScheme } = await import("../eip712");
+
+describe("createCdpEvmSigner", () => {
+  it("creates a signer with the correct address", async () => {
+    const signer = await createCdpEvmSigner(TEST_CDP_ACCOUNT_NAME);
     expect(signer.address).toBe(TEST_WALLET_ADDRESS);
   });
 
-  it("signer has signTypedData method", () => {
-    const signer = createEvmSigner(TEST_PRIVATE_KEY);
+  it("signer has signTypedData method", async () => {
+    const signer = await createCdpEvmSigner(TEST_CDP_ACCOUNT_NAME);
     expect(typeof signer.signTypedData).toBe("function");
   });
 
   it("signer can sign EIP-712 typed data", async () => {
-    const signer = createEvmSigner(TEST_PRIVATE_KEY);
+    const signer = await createCdpEvmSigner(TEST_CDP_ACCOUNT_NAME);
     const signature = await signer.signTypedData({
       domain: {
         name: "USD Coin",
@@ -47,7 +67,7 @@ describe("createEvmSigner", () => {
   });
 
   it("produces deterministic signatures for the same input", async () => {
-    const signer = createEvmSigner(TEST_PRIVATE_KEY);
+    const signer = await createCdpEvmSigner(TEST_CDP_ACCOUNT_NAME);
     const args = {
       domain: {
         name: "USD Coin",
@@ -84,13 +104,13 @@ describe("createEvmSigner", () => {
 });
 
 describe("createExactEvmScheme", () => {
-  it("creates an ExactEvmScheme instance", () => {
-    const scheme = createExactEvmScheme(TEST_PRIVATE_KEY);
+  it("creates an ExactEvmScheme instance", async () => {
+    const scheme = await createExactEvmScheme(TEST_CDP_ACCOUNT_NAME);
     expect(scheme.scheme).toBe("exact");
   });
 
-  it("scheme has createPaymentPayload method", () => {
-    const scheme = createExactEvmScheme(TEST_PRIVATE_KEY);
+  it("scheme has createPaymentPayload method", async () => {
+    const scheme = await createExactEvmScheme(TEST_CDP_ACCOUNT_NAME);
     expect(typeof scheme.createPaymentPayload).toBe("function");
   });
 });

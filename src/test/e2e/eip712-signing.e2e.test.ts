@@ -1,14 +1,28 @@
 import { describe, it, expect } from "vitest";
 import type { Hex } from "viem";
 import { verifyTypedData } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import {
   TEST_PRIVATE_KEY,
   TEST_WALLET_ADDRESS,
 } from "@/test/helpers/crypto";
 import { chainConfig } from "@/lib/chain-config";
-import { createEvmSigner, authorizationTypes } from "@/lib/x402/eip712";
+import { authorizationTypes } from "@/lib/x402/eip712";
 import { buildPaymentHeaders } from "@/lib/x402/headers";
 import crypto from "crypto";
+
+/**
+ * Create a viem-based signer from a private key for e2e testing.
+ * This bypasses CDP to test the EIP-712 signing math directly.
+ */
+function createTestSigner(privateKey: Hex) {
+  const account = privateKeyToAccount(privateKey);
+  return {
+    address: account.address,
+    signTypedData: (args: Parameters<typeof account.signTypedData>[0]) =>
+      account.signTypedData(args),
+  };
+}
 
 describe("E2E: EIP-712 Signing", () => {
   const RECIPIENT = ("0x" + "b".repeat(40)) as Hex;
@@ -32,7 +46,7 @@ describe("E2E: EIP-712 Signing", () => {
 
   describe("TransferWithAuthorization signing and verification", () => {
     it("should sign and verify a TransferWithAuthorization message", async () => {
-      const signer = createEvmSigner(TEST_PRIVATE_KEY);
+      const signer = createTestSigner(TEST_PRIVATE_KEY);
       const authorization = buildTransferAuthorization(
         TEST_WALLET_ADDRESS,
         RECIPIENT,
@@ -83,7 +97,7 @@ describe("E2E: EIP-712 Signing", () => {
     });
 
     it("should produce a valid signature for different amounts", async () => {
-      const signer = createEvmSigner(TEST_PRIVATE_KEY);
+      const signer = createTestSigner(TEST_PRIVATE_KEY);
       const amounts = [
         BigInt(1), // 0.000001 USDC
         BigInt(100000), // 0.1 USDC
@@ -133,7 +147,7 @@ describe("E2E: EIP-712 Signing", () => {
     });
 
     it("should produce a valid signature for different recipients", async () => {
-      const signer = createEvmSigner(TEST_PRIVATE_KEY);
+      const signer = createTestSigner(TEST_PRIVATE_KEY);
       const recipients: Hex[] = [
         ("0x" + "a".repeat(40)) as Hex,
         ("0x" + "c".repeat(40)) as Hex,
@@ -182,7 +196,7 @@ describe("E2E: EIP-712 Signing", () => {
     });
 
     it("should fail verification with a different signer address", async () => {
-      const signer = createEvmSigner(TEST_PRIVATE_KEY);
+      const signer = createTestSigner(TEST_PRIVATE_KEY);
       const authorization = buildTransferAuthorization(
         TEST_WALLET_ADDRESS,
         RECIPIENT,

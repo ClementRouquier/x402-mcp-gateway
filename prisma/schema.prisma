@@ -20,13 +20,13 @@ model User {
 }
 
 model HotWallet {
-  id                  String   @id @default(uuid())
-  address             String   @unique
-  encryptedPrivateKey String
-  userId              String   @unique
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id              String   @id @default(uuid())
+  address         String   @unique
+  cdpAccountName  String
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model SpendingPolicy {

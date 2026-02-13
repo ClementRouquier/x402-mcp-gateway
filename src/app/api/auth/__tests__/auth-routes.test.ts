@@ -46,14 +46,14 @@ vi.mock("siwe", () => {
   };
 });
 
-// Mock hot-wallet module (verify route calls createHotWallet for new users)
+// Mock hot-wallet module (verify route calls createCdpWallet for new users)
 vi.mock("@/lib/hot-wallet", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/hot-wallet")>();
   return {
     ...actual,
-    createHotWallet: vi.fn().mockReturnValue({
+    createCdpWallet: vi.fn().mockResolvedValue({
       address: "0x" + "d".repeat(40),
-      encryptedPrivateKey: "mock-encrypted-key",
+      cdpAccountName: "x402-mock-user-id",
     }),
   };
 });
@@ -109,7 +109,7 @@ describe("Auth API routes", () => {
 
   describe("POST /api/auth/verify", () => {
     it("creates a new user with HotWallet and SpendingPolicy on first login", async () => {
-      const { createHotWallet } = await import("@/lib/hot-wallet");
+      const { createCdpWallet } = await import("@/lib/hot-wallet");
 
       // Set up nonce cookie (as if /nonce was called first)
       cookieJar.set("siwe_nonce", "mock-nonce-value");
@@ -132,8 +132,8 @@ describe("Auth API routes", () => {
       expect(data.walletAddress).toBe(TEST_WALLET_ADDRESS.toLowerCase());
       expect(data.userId).toBeDefined();
 
-      // Verify createHotWallet was called (for new user provisioning)
-      expect(createHotWallet).toHaveBeenCalled();
+      // Verify createCdpWallet was called (for new user provisioning)
+      expect(createCdpWallet).toHaveBeenCalled();
 
       // Verify user record was created in DB
       const user = await prisma.user.findUnique({
@@ -153,7 +153,7 @@ describe("Auth API routes", () => {
       await prisma.hotWallet.create({
         data: {
           address: "0x" + "d".repeat(40),
-          encryptedPrivateKey: "existing-key",
+          cdpAccountName: "x402-existing-user",
           userId: TEST_USER_ID,
         },
       });

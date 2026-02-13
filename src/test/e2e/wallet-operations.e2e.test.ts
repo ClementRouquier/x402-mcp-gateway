@@ -6,10 +6,9 @@ import { resetTestDb, seedTestUser } from "@/test/helpers/db";
 import {
   TEST_PRIVATE_KEY,
   TEST_WALLET_ADDRESS,
-  encryptTestPrivateKey,
+  TEST_CDP_ACCOUNT_NAME,
 } from "@/test/helpers/crypto";
 import { chainConfig } from "@/lib/chain-config";
-import { createHotWallet, decryptPrivateKey } from "@/lib/hot-wallet";
 
 describe("E2E: Wallet Operations", () => {
   beforeEach(async () => {
@@ -20,39 +19,10 @@ describe("E2E: Wallet Operations", () => {
     await resetTestDb();
   });
 
-  describe("Hot wallet creation and validation", () => {
-    it("should create a hot wallet with a valid Ethereum address", () => {
-      const wallet = createHotWallet();
-
-      expect(wallet.address).toBeDefined();
-      expect(wallet.address.startsWith("0x")).toBe(true);
-      expect(wallet.address.length).toBe(42);
-      expect(isAddress(wallet.address)).toBe(true);
-      expect(wallet.encryptedPrivateKey).toBeDefined();
-      expect(wallet.encryptedPrivateKey).toContain(":");
-    });
-
+  describe("Key derivation", () => {
     it("should derive the correct address from the test private key", () => {
       const account = privateKeyToAccount(TEST_PRIVATE_KEY);
       expect(account.address).toBe(TEST_WALLET_ADDRESS);
-    });
-
-    it("should encrypt and decrypt a private key correctly", () => {
-      const encrypted = encryptTestPrivateKey(TEST_PRIVATE_KEY);
-
-      // Format: iv:authTag:encrypted (hex)
-      const parts = encrypted.split(":");
-      expect(parts.length).toBe(3);
-
-      // Decrypt should return the original key
-      const decrypted = decryptPrivateKey(encrypted);
-      expect(decrypted).toBe(TEST_PRIVATE_KEY);
-    });
-
-    it("should produce different ciphertexts for the same key (random IV)", () => {
-      const encrypted1 = encryptTestPrivateKey(TEST_PRIVATE_KEY);
-      const encrypted2 = encryptTestPrivateKey(TEST_PRIVATE_KEY);
-      expect(encrypted1).not.toBe(encrypted2);
     });
   });
 
@@ -130,18 +100,7 @@ describe("E2E: Wallet Operations", () => {
 
       expect(hotWallet.address).toBe(TEST_WALLET_ADDRESS);
       expect(isAddress(hotWallet.address)).toBe(true);
-      expect(hotWallet.encryptedPrivateKey).toBeDefined();
-    });
-
-    it("should decrypt the seeded hot wallet key to the test private key", async () => {
-      const { hotWallet } = await seedTestUser();
-
-      const decrypted = decryptPrivateKey(hotWallet.encryptedPrivateKey);
-      expect(decrypted).toBe(TEST_PRIVATE_KEY);
-
-      // Verify it derives to the correct address
-      const account = privateKeyToAccount(decrypted as `0x${string}`);
-      expect(account.address).toBe(hotWallet.address);
+      expect(hotWallet.cdpAccountName).toBe(TEST_CDP_ACCOUNT_NAME);
     });
   });
 });

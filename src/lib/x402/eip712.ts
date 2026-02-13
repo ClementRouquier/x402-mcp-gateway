@@ -3,41 +3,33 @@
  *
  * Uses @x402/evm's ExactEvmScheme which handles both EIP-3009 (USDC gasless)
  * and Permit2 (any ERC-20) signing. We provide a thin adapter to create
- * SDK-compatible signers from viem private keys.
+ * SDK-compatible signers from CDP managed accounts.
  */
-import type { Hex } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { getCdpClient } from "@/lib/cdp";
 import { ExactEvmScheme } from "@x402/evm";
 import type { ClientEvmSigner } from "@x402/evm";
 
 /**
- * Create an SDK-compatible ClientEvmSigner from a viem private key.
+ * Create an SDK-compatible ClientEvmSigner from a CDP managed account.
  *
- * viem's `privateKeyToAccount()` already satisfies the ClientEvmSigner
- * interface (has `address` and `signTypedData`).
+ * CDP's `EvmServerAccount` is structurally compatible with `ClientEvmSigner`
+ * — both have `address` and `signTypedData()`.
  */
-export function createEvmSigner(privateKey: Hex): ClientEvmSigner {
-  const account = privateKeyToAccount(privateKey);
-  return {
-    address: account.address,
-    signTypedData: (args) =>
-      account.signTypedData({
-        domain: args.domain as Parameters<typeof account.signTypedData>[0]["domain"],
-        types: args.types as Parameters<typeof account.signTypedData>[0]["types"],
-        primaryType: args.primaryType as string,
-        message: args.message as Parameters<typeof account.signTypedData>[0]["message"],
-      }),
-  };
+export async function createCdpEvmSigner(cdpAccountName: string): Promise<ClientEvmSigner> {
+  const cdp = getCdpClient();
+  const account = await cdp.evm.getOrCreateAccount({ name: cdpAccountName });
+  return account;
 }
 
 /**
- * Create an ExactEvmScheme instance from a viem private key.
+ * Create an ExactEvmScheme instance from a CDP managed account.
  *
  * The scheme handles both EIP-3009 (USDC) and Permit2 (generic ERC-20)
  * based on the `extra.assetTransferMethod` in payment requirements.
  */
-export function createExactEvmScheme(privateKey: Hex): ExactEvmScheme {
-  return new ExactEvmScheme(createEvmSigner(privateKey));
+export async function createExactEvmScheme(cdpAccountName: string): Promise<ExactEvmScheme> {
+  const signer = await createCdpEvmSigner(cdpAccountName);
+  return new ExactEvmScheme(signer);
 }
 
 // Re-export SDK types for convenience

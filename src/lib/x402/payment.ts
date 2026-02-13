@@ -1,11 +1,10 @@
-import type { Hex } from "viem";
 import { formatUnits } from "viem";
 import { x402Client, x402HTTPClient } from "@x402/core/client";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { prisma } from "@/lib/db";
-import { decryptPrivateKey, USDC_DECIMALS } from "@/lib/hot-wallet";
+import { USDC_DECIMALS } from "@/lib/hot-wallet";
 import { checkPolicy } from "@/lib/policy";
-import { createEvmSigner } from "./eip712";
+import { createCdpEvmSigner } from "./eip712";
 import { parsePaymentRequired, extractTxHashFromResponse, extractSettleResponse } from "./headers";
 import type { PaymentResult, SigningStrategy } from "./types";
 
@@ -23,6 +22,11 @@ function validateUrl(url: string): string | null {
 
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     return `Unsupported protocol: ${parsed.protocol} (only http and https are allowed)`;
+  }
+
+  // Allow localhost in development
+  if (process.env.NODE_ENV === "development") {
+    return null;
   }
 
   const hostname = parsed.hostname;
@@ -65,13 +69,13 @@ function validateUrl(url: string): string | null {
 }
 
 /**
- * Create an x402Client configured with EVM schemes for a given private key.
+ * Create an x402Client configured with EVM schemes for a given CDP account.
  *
  * Registers both V1 and V2 EVM exact schemes (EIP-3009 + Permit2)
  * via `registerExactEvmScheme` which handles wildcard eip155:* matching.
  */
-function createPaymentClient(privateKey: Hex): { client: x402Client; httpClient: x402HTTPClient } {
-  const signer = createEvmSigner(privateKey);
+async function createPaymentClient(cdpAccountName: string): Promise<{ client: x402Client; httpClient: x402HTTPClient }> {
+  const signer = await createCdpEvmSigner(cdpAccountName);
   const client = new x402Client();
   registerExactEvmScheme(client, { signer });
   const httpClient = new x402HTTPClient(client);
@@ -161,8 +165,6 @@ export async function executePayment(
     return { success: false, status: "rejected", signingStrategy: "rejected", error: "No hot wallet found for user" };
   }
 
-  const privateKey = decryptPrivateKey(hotWallet.encryptedPrivateKey) as Hex;
-
   // Step 4: Determine the amount from the first accepted requirement
   // SDK V2 uses `amount`, V1 uses `maxAmountRequired` — check both
   const selectedRequirement = paymentRequired.accepts[0];
@@ -201,7 +203,7 @@ export async function executePayment(
   }
 
   // Step 7: Create payment payload via SDK (handles EIP-3009 + Permit2)
-  const { client, httpClient } = createPaymentClient(privateKey);
+  const { client, httpClient } = await createPaymentClient(hotWallet.cdpAccountName);
   let paymentPayload;
   try {
     paymentPayload = await client.createPaymentPayload(paymentRequired);

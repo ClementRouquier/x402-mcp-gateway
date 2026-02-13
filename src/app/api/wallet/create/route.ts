@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { createHotWallet } from "@/lib/hot-wallet";
+import { createCdpWallet } from "@/lib/hot-wallet";
 import { rateLimit } from "@/lib/rate-limit";
 import { getAuthenticatedUser } from "@/lib/auth";
 
@@ -37,13 +37,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Create new hot wallet
-    const { address, encryptedPrivateKey } = createHotWallet();
+    // Create new CDP-managed hot wallet
+    const { address, cdpAccountName } = await createCdpWallet(userId);
 
     await prisma.hotWallet.create({
       data: {
         address,
-        encryptedPrivateKey,
+        cdpAccountName,
         userId: user.id,
       },
     });

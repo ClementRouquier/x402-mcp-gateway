@@ -1,8 +1,26 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { privateKeyToAccount } from "viem/accounts";
 import { resetTestDb, seedTestUser } from "@/test/helpers/db";
 import { createTestTransaction, createTestPendingPayment } from "@/test/helpers/fixtures";
+import { TEST_PRIVATE_KEY } from "@/test/helpers/crypto";
 import { prisma } from "@/lib/db";
 import type { Hex } from "viem";
+
+// Mock CDP client — return a signer backed by the test private key
+const testAccount = privateKeyToAccount(TEST_PRIVATE_KEY);
+vi.mock("@/lib/cdp", () => ({
+  getCdpClient: vi.fn(() => ({
+    evm: {
+      getOrCreateAccount: vi.fn(() =>
+        Promise.resolve({
+          address: testAccount.address,
+          signTypedData: (args: Parameters<typeof testAccount.signTypedData>[0]) =>
+            testAccount.signTypedData(args),
+        }),
+      ),
+    },
+  })),
+}));
 
 /**
  * Minimal harness that captures tool handlers registered via McpServer.registerTool().

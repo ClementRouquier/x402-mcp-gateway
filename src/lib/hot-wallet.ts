@@ -1,15 +1,13 @@
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
   createPublicClient,
-  createWalletClient,
   http,
   formatUnits,
   parseUnits,
   isAddress,
 } from "viem";
-import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { chainConfig } from "@/lib/chain-config";
+import { getCdpClient } from "@/lib/cdp";
 
 const USDC_ADDRESS = chainConfig.usdcAddress;
 const USDC_DECIMALS = 6;
@@ -34,54 +32,22 @@ const USDC_ABI = [
   },
 ] as const;
 
-function getEncryptionKey(): Buffer {
-  const key = process.env.HOT_WALLET_ENCRYPTION_KEY;
-  if (!key) {
-    throw new Error("HOT_WALLET_ENCRYPTION_KEY is not set");
-  }
-  // Expect a 64-char hex string (32 bytes)
-  return Buffer.from(key, "hex");
-}
-
-export function encryptPrivateKey(privateKey: string): string {
-  const key = getEncryptionKey();
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-  const encrypted = Buffer.concat([
-    cipher.update(privateKey, "utf8"),
-    cipher.final(),
-  ]);
-  const authTag = cipher.getAuthTag();
-  // Store as iv:authTag:encrypted (all hex)
-  return `${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted.toString("hex")}`;
-}
-
-export function decryptPrivateKey(encryptedData: string): string {
-  const key = getEncryptionKey();
-  const [ivHex, authTagHex, encryptedHex] = encryptedData.split(":");
-  const iv = Buffer.from(ivHex, "hex");
-  const authTag = Buffer.from(authTagHex, "hex");
-  const encrypted = Buffer.from(encryptedHex, "hex");
-  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-  decipher.setAuthTag(authTag);
-  const decrypted = Buffer.concat([
-    decipher.update(encrypted),
-    decipher.final(),
-  ]);
-  return decrypted.toString("utf8");
-}
-
-export function createHotWallet(): {
+export async function createCdpWallet(userId: string): Promise<{
   address: string;
-  encryptedPrivateKey: string;
-} {
-  const privateKey = generatePrivateKey();
-  const account = privateKeyToAccount(privateKey);
-  const encryptedPrivateKey = encryptPrivateKey(privateKey);
+  cdpAccountName: string;
+}> {
+  const cdp = getCdpClient();
+  const cdpAccountName = `x402-${userId}`;
+  const account = await cdp.evm.getOrCreateAccount({ name: cdpAccountName });
   return {
     address: account.address,
-    encryptedPrivateKey,
+    cdpAccountName,
   };
+}
+
+export async function getCdpAccount(cdpAccountName: string) {
+  const cdp = getCdpClient();
+  return cdp.evm.getOrCreateAccount({ name: cdpAccountName });
 }
 
 function getPublicClient() {
@@ -146,22 +112,11 @@ export async function withdrawFromHotWallet(
     );
   }
 
-  // Decrypt private key and create wallet client
-  const privateKey = decryptPrivateKey(hotWallet.encryptedPrivateKey);
-  const account = privateKeyToAccount(privateKey as `0x${string}`);
-  const rpcUrl = process.env.RPC_URL;
-  const walletClient = createWalletClient({
-    account,
-    chain: chainConfig.chain,
-    transport: http(rpcUrl),
-  });
-
-  // Submit ERC-20 transfer
-  const txHash = await walletClient.writeContract({
-    address: USDC_ADDRESS,
-    abi: USDC_ABI,
-    functionName: "transfer",
-    args: [toAddress as `0x${string}`, parseUnits(String(amount), USDC_DECIMALS)],
+  // Use CDP account for signing the ERC-20 transfer
+  const cdpAccount = await getCdpAccount(hotWallet.cdpAccountName);
+  const txHash = await cdpAccount.sendTransaction({
+    to: USDC_ADDRESS,
+    data: encodeFunctionData(toAddress as `0x${string}`, parseUnits(String(amount), USDC_DECIMALS)),
   });
 
   // Log withdrawal transaction
@@ -169,7 +124,7 @@ export async function withdrawFromHotWallet(
     data: {
       amount,
       endpoint: `withdrawal:${toAddress}`,
-      txHash,
+      txHash: typeof txHash === "string" ? txHash : txHash.transactionHash,
       network: chainConfig.chain.name.toLowerCase(),
       status: "completed",
       type: "withdrawal",
@@ -177,7 +132,18 @@ export async function withdrawFromHotWallet(
     },
   });
 
-  return { txHash };
+  return { txHash: typeof txHash === "string" ? txHash : txHash.transactionHash };
+}
+
+/**
+ * Encode ERC-20 transfer(address,uint256) function call data.
+ */
+function encodeFunctionData(to: `0x${string}`, amount: bigint): `0x${string}` {
+  // transfer(address,uint256) selector: 0xa9059cbb
+  const selector = "a9059cbb";
+  const paddedTo = to.slice(2).toLowerCase().padStart(64, "0");
+  const paddedAmount = amount.toString(16).padStart(64, "0");
+  return `0x${selector}${paddedTo}${paddedAmount}`;
 }
 
 export { USDC_ADDRESS, USDC_DECIMALS };
