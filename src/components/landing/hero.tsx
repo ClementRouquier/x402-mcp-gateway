@@ -1,0 +1,52 @@
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+
+export function Hero() {
+  return (
+    <section className="relative overflow-hidden">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10"
+      >
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-[size:4rem_4rem]" />
+        <div className="absolute left-1/2 top-0 -translate-x-1/2 h-[500px] w-[800px] rounded-full bg-primary/5 blur-3xl" />
+      </div>
+
+      <div className="mx-auto max-w-5xl px-6 pb-24 pt-20 sm:pt-32 lg:pt-40">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex flex-wrap justify-center gap-2 mb-8">
+            <Badge variant="secondary">Agentic Commerce</Badge>
+            <Badge variant="secondary">x402 Protocol</Badge>
+            <Badge variant="secondary">CDP SDK</Badge>
+            <Badge variant="secondary">Bitrefill</Badge>
+          </div>
+
+          <h1 className="max-w-4xl text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+            The Agentic UI for Headless Commerce
+          </h1>
+
+          <p className="mt-6 max-w-2xl text-lg leading-8 text-muted-foreground sm:text-xl">
+            An interactive AI-powered interface that lets you browse, shop, and
+            pay on Bitrefill through conversation. Built on CDP SDK and the x402
+            payment protocol — your agent can pay anyone on the open web, not
+            just Bitrefill.
+          </p>
+
+          <div className="mt-10 flex flex-col gap-4 sm:flex-row">
+            <Button asChild size="lg" className="text-base">
+              <Link href="/dashboard">
+                Try the Dashboard
+                <ArrowRight />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="lg" className="text-base">
+              <Link href="#features">See What It Does</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
